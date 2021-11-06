@@ -12,21 +12,20 @@ local static_spawnpoint = minetest.setting_get_pos("static_spawnpoint") or {x=0,
 rspawn.admin = minetest.settings:get("name") or "" -- For messaging only
 
 -- Setting from beds mod
-rspawn.bedspawn = minetest.setting_getbool("enable_bed_respawn") ~= false -- from beds mod
+rspawn.bedspawn = minetest.settings:get_bool("enable_bed_respawn") or false -- from beds mod
 
 -- rSpawn specific settings
-rspawn.debug_on = minetest.settings:get_bool("rspawn.debug")
-rspawn.spawnanywhere = minetest.settings:get_bool("rspawn.spawn_anywhere") ~= false
-rspawn.kick_on_fail = minetest.settings:get_bool("rspawn.kick_on_fail") == true
+rspawn.debug_on = minetest.settings:get_bool("rspawn.debug") or false
+rspawn.spawnanywhere = minetest.settings:get_bool("rspawn.spawn_anywhere") or false
+rspawn.kick_on_fail = minetest.settings:get_bool("rspawn.kick_on_fail") or false
 rspawn.max_pregen_spawns = tonumber(minetest.settings:get("rspawn.max_pregen") or 5)
 rspawn.search_radius = tonumber(minetest.settings:get("rspawn.search_radius") or 32)
 rspawn.gen_frequency = tonumber(minetest.settings:get("rspawn.gen_frequency") or 30)
-rspawn.spawn_block = minetest.settings:get("rspawn.spawn_block") or "default:dirt_with_grass"
 
-rspawn.min_x = tonumber(minetest.settings:get("rspawn.min_x") or -31000)
-rspawn.max_x = tonumber(minetest.settings:get("rspawn.max_x") or 31000)
-rspawn.min_z = tonumber(minetest.settings:get("rspawn.min_z") or -31000)
-rspawn.max_z = tonumber(minetest.settings:get("rspawn.max_z") or 31000)
+rspawn.min_x = tonumber(minetest.settings:get("rspawn.min_x") or -1500)
+rspawn.max_x = tonumber(minetest.settings:get("rspawn.max_x") or 1500)
+rspawn.min_z = tonumber(minetest.settings:get("rspawn.min_z") or -1500)
+rspawn.max_z = tonumber(minetest.settings:get("rspawn.max_z") or 1500)
     
 dofile(mpath.."/lua/data.lua")
 dofile(mpath.."/lua/guestlists.lua")
@@ -35,23 +34,12 @@ dofile(mpath.."/lua/forceload.lua")
 dofile(mpath.."/lua/debugging.lua")
 
 
-minetest.after(0,function()
-    if not minetest.registered_items[rspawn.spawn_block] then
-        rspawn.spawn_block = "default:dirt_with_grass"
-    end
-end)
 
 
 rspawn:spawnload()
 
-local function set_default_node(pos)
-    if rspawn.spawn_block then
-        minetest.set_node(pos, {name=rspawn.spawn_block})
-    end
-end
-
 local function daylight_above(min_daylight, pos)
-    local level = minetest.get_node_light(pos, 0.5)
+    local level = minetest.get_natural_light(pos, 0.5)
     return min_daylight <= level
 end
 
@@ -80,10 +68,10 @@ function rspawn:newspawn(pos, radius)
 
     rspawn:debug("Searching "..minetest.pos_to_string(pos1).." to "..minetest.pos_to_string(pos2))
 
-    local airnodes = minetest.find_nodes_in_area(pos1, pos2, {"air"})
+    local airnodes = minetest.find_nodes_in_area(pos1, pos2, {"group:spreading"})
     local validnodes = {}
 
-    rspawn:debug("Found "..tostring(#airnodes).." air nodes within "..tostring(radius))
+    rspawn:debug("Found "..tostring(#airnodes).." spreading nodes within "..tostring(radius))
     for _,anode in pairs(airnodes) do
         local under = minetest.get_node( {x=anode.x, y=anode.y-1, z=anode.z} ).name
         local over = minetest.get_node( {x=anode.x, y=anode.y+1, z=anode.z} ).name
@@ -149,10 +137,7 @@ function rspawn:set_player_spawn(name, newpos)
 
     minetest.chat_send_player(name, "New spawn set at "..spos)
 
-    tplayer:setpos(rspawn.playerspawns[name])
-    minetest.after(0.5,function()
-        set_default_node({x=newpos.x,y=newpos.y-1,z=newpos.z})
-    end)
+    tplayer:set_pos(rspawn.playerspawns[name])
 
     return true
 end
@@ -208,7 +193,7 @@ function rspawn:renew_player_spawn(playername)
 end
 
 minetest.register_on_joinplayer(function(player)
-    rspawn:set_newplayer_spawn(player, 5)
+    --rspawn:set_newplayer_spawn(player, 5)
 end)
 
 minetest.register_on_respawnplayer(function(player)
@@ -222,13 +207,13 @@ minetest.register_on_respawnplayer(function(player)
             return true
         end
     end
-
+    rspawn:set_newplayer_spawn(player, 5)
     local pos = rspawn.playerspawns[name]
 
     -- And if no bed, nor bed spwawning not active:
     if pos then
         minetest.log("action", name.." respawns at "..minetest.pos_to_string(pos))
-        player:setpos(pos)
+        player:set_pos(pos)
         return true
     else
         minetest.chat_send_player(name, "Failed to find your spawn point!")
